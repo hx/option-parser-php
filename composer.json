@@ -1,0 +1,18 @@
+{
+    "name": "hx/option-parser",
+    "description": "Option Parser for CLI Apps",
+    "require-dev": {
+        "phpunit/phpunit": "3.7@stable"
+    },
+    "license": "Apache License 2.0",
+    "authors": [
+        {
+            "name": "Neil E. Pearson",
+            "email": "neil@helium.net.au"
+        }
+    ],
+    "minimum-stability": "dev",
+    "autoload": {
+        "psr-4": {"Hx\\": "src/"}
+    }
+}
