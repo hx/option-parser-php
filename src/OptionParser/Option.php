@@ -4,6 +4,7 @@ namespace Hx\OptionParser;
 
 use Hx\OptionParser;
 use Hx\OptionParser\Exceptions\InvalidOptionSpec;
+use Hx\OptionParser\Exceptions\MultipleValuesNotAllowed;
 
 /**
  * Class Option
@@ -11,7 +12,7 @@ use Hx\OptionParser\Exceptions\InvalidOptionSpec;
  * @property-read string $name The long name of the option
  * @property-read string $initial The short (single-digit) name of the option
  * @property-read boolean $present Whether the option was included
- * @property-read mixed $value Value (or values) passed to the option, or false if negated, or null if omitted
+ * @property mixed $value Value (or values) passed to the option, or false if negated, or null if omitted
  * @property-read string $description Description of the option (for printing help)
  *
  * @property-read bool $REQUIRED The REQUIRED flag's state
@@ -53,7 +54,7 @@ class Option {
 
     private $initial;
     private $name;
-    private $present;
+    private $present = false;
     private $value;
 
     private $flags = 0;
@@ -143,11 +144,16 @@ class Option {
                 'Please specify an initial or a long name (or both)');
         }
 
+        // Ensure multi-value options have pushable arrays
+        if($this->MULTIPLE_VALUES && !is_array($this->value)) {
+            $this->value = [];
+        }
+
     }
 
     public function __get($name) {
         if(in_array($name, ['name', 'initial', 'present', 'value', 'description'])) {
-            if($this->parseTrigger) {
+            if($this->parseTrigger && ($name === 'present' || $name === 'value')) {
                 call_user_func($this->parseTrigger);
                 $this->parseTrigger = null;
             }
@@ -157,6 +163,26 @@ class Option {
             return (bool) ($this->flags & $int);
         }
         throw new \Exception("Property $name is not defined on class " . __CLASS__);
+    }
+
+    /**
+     * @param string $name
+     * @param mixed $value
+     * @throws MultipleValuesNotAllowed
+     */
+    public function __set($name, $value) {
+        if($name === 'value') {
+            $this->present = true;
+            if(is_array($this->value)) {
+                $this->value[] = $value;
+            }
+            elseif($this->value === null || (is_string($value) && $this->value === true)) {
+                $this->value = $value;
+            }
+            else {
+                throw new MultipleValuesNotAllowed;
+            }
+        }
     }
 
     /**

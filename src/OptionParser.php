@@ -2,14 +2,16 @@
 
 namespace Hx;
 
+use Exception;
+use Hx\OptionParser\Exceptions\MultipleValuesNotAllowed;
 use Hx\OptionParser\Option;
 use Hx\OptionParser\OptionCollection;
+use Hx\OptionParser\Exceptions\InvalidArgument;
 use Hx\OptionParser\Exceptions\InvalidOptionSpec;
 
 /**
  * Class OptionParser
  * @package Hx
- * @property-read OptionCollection|Option[] $options
  * @property-read string[] $arguments
  */
 class OptionParser implements \ArrayAccess, \Iterator, \Countable {
@@ -48,8 +50,25 @@ class OptionParser implements \ArrayAccess, \Iterator, \Countable {
     private $flags = 0;
 
     /**
+     * @var Option[]|string[]
+     */
+    private $parseResultsByOrder = [];
+    private $cursor = 0;
+
+    /**
+     * @var Option[]
+     */
+    private $parseResultsByName = [];
+
+    /**
+     * @var Option[]
+     */
+    private $parseResultsByInitial = [];
+
+    /**
      * @param array $argv Arguments to parse
      * @param int $flags,... One or more flags as defined by the constants on this class
+     * @throws \Exception
      */
     public function __construct(array $argv = null, $flags = null) {
 
@@ -71,14 +90,42 @@ class OptionParser implements \ArrayAccess, \Iterator, \Countable {
         };
         $this->parseTrigger = $trigger->bindTo($this);
 
-        // TODO: handle flags
+        // Handle flags if there are more than one argument
+        if(func_num_args() > 1) {
+
+            // Loop through all but the first argument
+            foreach(array_slice(func_get_args(), 1) as $arg) {
+
+                // Make sure it's an integer
+                if(!is_int($arg)) {
+                    throw new Exception('Additional arguments must be integers.');
+                }
+
+                // Add it to the flag set
+                $this->flags |= $arg;
+            }
+        }
+    }
+
+    /**
+     * Get the state of the given flag
+     * @param int $flag
+     * @return bool
+     */
+    private function hasFlag($flag) {
+        return (bool) ($this->flags & $flag);
     }
 
     /**
      * Single-run method to parse arguments originally passed to constructor
+     * @throws InvalidArgument
      * @return $this
+     * @todo refactor into smaller procedures once a sequence of events is established
      */
     private function parse() {
+        /**
+         * @type Option $recentOption
+         */
         if(!$this->parsed) {
 
             $this->parsed = true;
@@ -113,7 +160,16 @@ class OptionParser implements \ArrayAccess, \Iterator, \Countable {
                 $arg = $argv[$i];
 
                 // Pattern to match options and (optionally) =values
-                if(preg_match('`^(--[a-z][a-z\d-]|-[a-z\d?])(=.+)?$`i', $arg, $matches)) {
+                if(preg_match('`^(--[a-z][a-z\d-]+|-[a-z\d?])(=.+)?$`i', $arg, $matches)) {
+
+                    // Ensure the previous option got a value if one was required
+                    // TODO: repeat this after the last argument
+                    if($recentOption && $recentOption->REQUIRE_VALUE && !is_string($recentOption->value)) {
+                        throw new InvalidArgument($argv, $i - 1, "Option '{$argv[$i - 1]}' requires a value.");
+                    }
+
+                    // Relieve the recent option
+                    $recentOption = null;
 
                     // Start with a value of true, and no option
                     $value = true;
@@ -143,18 +199,99 @@ class OptionParser implements \ArrayAccess, \Iterator, \Countable {
                         $name = null;
 
                         if(isset($this->dictionaryByInitial[$initial])) {
-                            $option = $initial;
+                            $option = $this->dictionaryByInitial[$initial];
                         }
                     }
 
-                    // Is this an undeclared option
+                    // Is this an undeclared option?
+                    if($option === null) {
 
+                        // Throw if undeclared options aren't allowed
+                        if(!$this->hasFlag(self::ALLOW_UNDECLARED)) {
+                            throw new InvalidArgument($argv, $i, 'Unknown option');
+                        }
 
+                        // Create a new option
+                        // TODO: multiples in undeclared? retrieve from $parseResultsByName perhaps?
+                        $option = new Option([$name ?: $initial], $this->parseTrigger);
+                    }
+
+                    // Add the option to the parser results
+                    $this->parseResultsByOrder[] = $option; // May result in duplicate references within this array.
+                    if($option->name !== null) {
+                        $this->parseResultsByName[$option->name] = $option;
+                    }
+                    if($option->initial !== null) {
+                        $this->parseResultsByInitial[$option->initial] = $option;
+                    }
+
+                    // Is false allowed?
+                    if($value === false && !$option->ALLOW_FALSE) {
+                        throw new InvalidArgument($argv, $i, "The '$arg' option cannot be negated.");
+                    }
+
+                    // Make this the 'recent option' if values are allowed
+                    if(!$option->FORBID_VALUE) {
+                        $recentOption = $option;
+                    }
+
+                    // Process a =value
                     if(isset($matches[2])) {
 
+                        // Make sure values are allowed
+                        if($option->FORBID_VALUE) {
+                            throw new InvalidArgument($argv, $i, "The '$arg' option cannot be assigned a value.");
+                        }
+
+                        // Don't allow negation of an assignment
+                        if($value === false) {
+                            throw new InvalidArgument($argv, $i, "Option negation with value assignment is not allowed.");
+                        }
+
+                        // Remove the leading = sign
+                        $value = substr($matches[2], 1);
                     }
+                    // Assign the value (removing the leading = sign)
+                    try {
+                        $option->value = $value;
+
+                        // Don't accept any more values if a string was supplied,
+                        // unless multiple values are allowed
+                        if(is_string($value) && !$option->MULTIPLE_VALUES) {
+                            $recentOption = null;
+                        }
+                    }
+                    catch(MultipleValuesNotAllowed $e) {
+                        throw new InvalidArgument($argv, $i, "The '$arg' option was specified more than once.");
+                    }
+
+
                 }
 
+                // Not an option; could be a value?
+                elseif($recentOption) {
+
+                    // Assign the value.
+                    // TODO: repetitious; refactor
+                    try {
+                        $recentOption->value = $arg;
+
+                        // Remove it as the recent option
+                        if(!$recentOption->MULTIPLE_VALUES) {
+                            $recentOption = null;
+                        }
+                    }
+                    catch(MultipleValuesNotAllowed $e) {
+                        throw new InvalidArgument($argv, $i, "The '{$argv[$i - 1]}' option was specified more than once.");
+                    }
+
+
+                }
+
+                // Must be an argument.
+                else {
+                    $this->parseResultsByOrder[] = $arg;
+                }
 
             }
 
@@ -163,11 +300,23 @@ class OptionParser implements \ArrayAccess, \Iterator, \Countable {
     }
 
     public function offsetGet($offset) {
-
+        $this->parse();
+        if(is_string($offset)) {
+            $collection = (strlen($offset) === 1)
+                ? $this->parseResultsByInitial
+                : $this->parseResultsByName;
+            if(isset($collection[$offset])) {
+                return $collection[$offset]->value;
+            }
+        }
+        elseif(isset($this->parseResultsByOrder[$offset])) {
+            return $this->parseResultsByOrder[$offset];
+        }
+        return null;
     }
 
     public function offsetSet($offset, $value) {
-
+        throw new Exception('Array access is read-only');
     }
 
     /**
@@ -218,96 +367,48 @@ class OptionParser implements \ArrayAccess, \Iterator, \Countable {
         return $option;
     }
 
-    /**
-     * (PHP 5 &gt;= 5.0.0)<br/>
-     * Return the current element
-     * @link http://php.net/manual/en/iterator.current.php
-     * @return mixed Can return any type.
-     */
     public function current() {
-        // TODO: Implement current() method.
+        $this->parse();
+        return current($this->parseResultsByOrder);
     }
 
-    /**
-     * (PHP 5 &gt;= 5.0.0)<br/>
-     * Move forward to next element
-     * @link http://php.net/manual/en/iterator.next.php
-     * @return void Any returned value is ignored.
-     */
     public function next() {
-        // TODO: Implement next() method.
+        $this->parse();
+        next($this->parse()->parseResultsByInitial);
     }
 
-    /**
-     * (PHP 5 &gt;= 5.0.0)<br/>
-     * Return the key of the current element
-     * @link http://php.net/manual/en/iterator.key.php
-     * @return mixed scalar on success, or null on failure.
-     */
     public function key() {
-        // TODO: Implement key() method.
+        $this->parse();
+        return key($this->parseResultsByInitial);
     }
 
-    /**
-     * (PHP 5 &gt;= 5.0.0)<br/>
-     * Checks if current position is valid
-     * @link http://php.net/manual/en/iterator.valid.php
-     * @return boolean The return value will be casted to boolean and then evaluated.
-     * Returns true on success or false on failure.
-     */
     public function valid() {
-        // TODO: Implement valid() method.
+        $this->parse();
+        return $this->key() <= $this->count();
     }
 
-    /**
-     * (PHP 5 &gt;= 5.0.0)<br/>
-     * Rewind the Iterator to the first element
-     * @link http://php.net/manual/en/iterator.rewind.php
-     * @return void Any returned value is ignored.
-     */
     public function rewind() {
-        // TODO: Implement rewind() method.
+        $this->parse();
+        reset($this->parseResultsByInitial);
     }
 
-    /**
-     * (PHP 5 &gt;= 5.0.0)<br/>
-     * Whether a offset exists
-     * @link http://php.net/manual/en/arrayaccess.offsetexists.php
-     * @param mixed $offset <p>
-     * An offset to check for.
-     * </p>
-     * @return boolean true on success or false on failure.
-     * </p>
-     * <p>
-     * The return value will be casted to boolean if non-boolean was returned.
-     */
     public function offsetExists($offset) {
-        // TODO: Implement offsetExists() method.
+        return $this->offsetGet($offset) !== null;
     }
 
-    /**
-     * (PHP 5 &gt;= 5.0.0)<br/>
-     * Offset to unset
-     * @link http://php.net/manual/en/arrayaccess.offsetunset.php
-     * @param mixed $offset <p>
-     * The offset to unset.
-     * </p>
-     * @return void
-     */
     public function offsetUnset($offset) {
-        // TODO: Implement offsetUnset() method.
+        $this->offsetSet($offset, null); // Will throw Exception
     }
 
-    /**
-     * (PHP 5 &gt;= 5.1.0)<br/>
-     * Count elements of an object
-     * @link http://php.net/manual/en/countable.count.php
-     * @return int The custom count as an integer.
-     * </p>
-     * <p>
-     * The return value is cast to an integer.
-     */
     public function count() {
-        // TODO: Implement count() method.
+        $this->parse();
+        return count($this->parseResultsByInitial);
+    }
+
+    public function __get($name) {
+        if($name === 'arguments') {
+            return array_filter($this->parseResultsByOrder, 'is_string');
+        }
+        throw new Exception("Unknown property $name on " . __CLASS__);
     }
 }

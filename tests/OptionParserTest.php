@@ -13,7 +13,6 @@ class OptionParserTest extends PHPUnit_Framework_TestCase {
         $this->assertTrue($parser['a']);
         $this->assertCount(1, $parser);
         $this->assertCount(0, $parser->arguments);
-        $this->assertcount(1, $parser->options);
     }
 
     public function testNegate() {
@@ -30,19 +29,20 @@ class OptionParserTest extends PHPUnit_Framework_TestCase {
      * @dataProvider dataValue
      */
     public function testValue($variation, $optionCount) {
-        $parser = new OptionParser([$variation]);
+        $parser = new OptionParser(explode(' ', $variation), OptionParser::ALLOW_UNDECLARED);
         $foo = $parser->add('f', 'foo');
         $parser->add('x');
         $this->assertTrue($foo->present);
         $this->assertSame('bar', $foo->value);
-        $this->assertTrue($parser['foo']);
-        $this->assertTrue($parser['f']);
-        $this->assertCount($optionCount, $parser->options);
+        $this->assertSame('bar', $parser['foo']);
+        $this->assertSame('bar', $parser['f']);
+        $this->assertCount($optionCount, $parser);
         $this->assertCount(0, $parser->arguments);
     }
     public function dataValue() {
         return [
             ['--foo=bar', 1],
+            ['-f=bar', 1],
             ['-xf=bar', 2],
             ['--foo bar', 1],
             ['-f bar', 1]
