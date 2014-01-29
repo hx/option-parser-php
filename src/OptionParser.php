@@ -303,8 +303,8 @@ class OptionParser implements \ArrayAccess, \Iterator, \Countable {
         $this->parse();
         if(is_string($offset)) {
             $collection = (strlen($offset) === 1)
-                ? $this->parseResultsByInitial
-                : $this->parseResultsByName;
+                ? $this->dictionaryByInitial
+                : $this->dictionaryByName;
             if(isset($collection[$offset])) {
                 return $collection[$offset]->value;
             }

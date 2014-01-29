@@ -129,7 +129,6 @@ class Option {
 
         // In case a default was supplied, set presence and cast if necessary
         if($this->value !== null) {
-            $this->present = true;
             if($this->FORBID_VALUE) {
                 $this->value = (bool) $this->value;
             }
@@ -172,16 +171,16 @@ class Option {
      */
     public function __set($name, $value) {
         if($name === 'value') {
-            $this->present = true;
             if(is_array($this->value)) {
                 $this->value[] = $value;
             }
-            elseif($this->value === null || (is_string($value) && $this->value === true)) {
+            elseif(!$this->present || (is_string($value) && $this->value === true)) {
                 $this->value = $value;
             }
             else {
                 throw new MultipleValuesNotAllowed;
             }
+            $this->present = true;
         }
     }
 
