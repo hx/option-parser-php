@@ -411,4 +411,92 @@ class OptionParser implements \ArrayAccess, \Iterator, \Countable {
         }
         throw new Exception("Unknown property $name on " . __CLASS__);
     }
+
+    /**
+     * @param int $indent Left indent for options list
+     * @param int $spacing Spacing between options and their descriptions
+     * @param null|int $width Total column width (including left indent)
+     * @return int|null
+     */
+    public function summary($indent = 2, $spacing = 2, $width = null) {
+
+        // If width isn't specified, attempt to use terminal width
+        if($width === null) {
+            $width = intval(getenv('COLUMNS') ?: `tput cols`);
+        }
+
+        $output = [];
+
+        $optionsWidth = 0;
+        $indent = str_repeat(' ', $indent);
+        $spacing = str_repeat(' ', $spacing);
+
+        foreach($this->dictionaryByOrder as $item) {
+
+            // Strings are good to go
+            if(is_string($item)) {
+                $output[] = self::wrap($item, $width);
+            }
+
+            // Options need to be pre-formatted to determine the width of the options column
+            else {
+                /**
+                 * @type Option $item
+                 */
+
+                // First, the initial, or a placeholder if it's missing
+                $def = $indent . (($item->initial !== null)
+                    ? '-' . $item->initial . (($item->name === null) ? ' ' : ',')
+                    : '   ');
+
+                // Next, the name
+                if($item->name !== null) {
+
+                    $def .= ' --';
+
+                    // Can it be negated?
+                    if($item->ALLOW_FALSE) {
+                        $def .= '[' . self::$falsePrefix . ']-';
+                    }
+
+                    $def .= $item->name;
+                }
+
+                // Finally, a value label
+                if($item->valueLabel !== null) {
+                    $def .= (strpos($item->valueLabel, '|') === false)
+                        ? " $item->valueLabel"
+                        : " [$item->valueLabel]";
+                }
+
+                // Column spacing
+                $def .= $spacing;
+
+                // Adjust option width using the option definition
+                $optionsWidth = max($optionsWidth, strlen($def));
+
+                // Add it to the output list
+                $output[] = ($item->description === null)
+                    ? [$def]
+                    : [$def, $item->description];
+            }
+        }
+
+        foreach($output as $k => $item) {
+            if(is_array($item)) {
+                $output[$k] = str_pad($item[0], $optionsWidth, ' ', STR_PAD_RIGHT);
+                if(isset($item[1])) {
+                    $output[$k] .= self::wrap($item[1], $width - $optionsWidth, $optionsWidth);
+                }
+            }
+        }
+
+        return implode("\n", $output) . "\n";
+
+    }
+
+    private function wrap($text, $width, $hangingIndent = 0) {
+        $indentText = str_repeat(' ', $hangingIndent);
+        return trim(preg_replace("`(.{1,$width})(\\s+|$)`", "\$1\n$indentText", $text));
+    }
 }

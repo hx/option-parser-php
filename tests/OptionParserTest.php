@@ -84,4 +84,42 @@ class OptionParserTest extends PHPUnit_Framework_TestCase {
         ];
     }
 
+    public function testSummary() {
+        $parser = new OptionParser([]);
+        $parser->add('Here is how we want it to look.');
+        $parser->add(' ');
+        $parser->add('a', 'alpha', 'Something with alpha');
+        $parser->add('b', 'beta', Option::ALLOW_FALSE, 'Something with beta that also allows false values, and has an explanation long enough to wrap');
+        $parser->add('c', '[SOMETHING]', 'Something with a value label');
+        $parser->add(' ');
+        $parser->add("A separator line.");
+        $parser->add(' ');
+        $parser->add('d', 'delta', '[THIS|THAT]', 'Something with a value label that presents multiple possibilities, and therefore should be wrapped in square brackets.');
+        $parser->add('echo', 'Something with no initial.');
+        $parser->add('foxtrot', '[FOX]', 'Something with no initial, and a value label.');
+
+        $expected = <<< EOF
+Here is how we want it to look.
+
+  -a, --alpha              Something with alpha
+  -b, --[no]-beta          Something with beta that also
+                           allows false values, and has an
+                           explanation long enough to wrap
+  -c  SOMETHING            Something with a value label
+
+A separator line.
+
+  -d, --delta [THIS|THAT]  Something with a value label that
+                           presents multiple possibilities,
+                           and therefore should be wrapped
+                           in square brackets.
+      --echo               Something with no initial.
+      --foxtrot FOX        Something with no initial, and a
+                           value label.
+
+EOF;
+
+        $this->assertSame($expected, $parser->summary(2, 2, 60));
+    }
+
 }

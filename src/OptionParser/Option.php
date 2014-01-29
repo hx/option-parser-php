@@ -14,6 +14,7 @@ use Hx\OptionParser\Exceptions\MultipleValuesNotAllowed;
  * @property-read boolean $present Whether the option was included
  * @property mixed $value Value (or values) passed to the option, or false if negated, or null if omitted
  * @property-read string $description Description of the option (for printing help)
+ * @property-read string $valueLabel Value label for the option (for printing help)
  *
  * @property-read bool $REQUIRED The REQUIRED flag's state
  * @property-read bool $FORBID_VALUE The FORBID_VALUE flag's state
@@ -60,6 +61,7 @@ class Option {
     private $flags = 0;
 
     private $description;
+    private $valueLabel;
 
     private $parseTrigger;
 
@@ -88,8 +90,11 @@ class Option {
                     // Defaults - start with an equal sign
                     ['`^=(.+)$`', 'value', 'default'],
 
+                    // Value label - inside square brackets
+                    ['`^\[(.+)\]$`', 'valueLabel', 'value label'],
+
                     // Descriptions - anything else over one character
-                    ['.{2,}', 'description', 'a description']
+                    ['`.{2,}`', 'description', 'a description']
                 ];
 
                 foreach($formats as $format) {
@@ -151,7 +156,7 @@ class Option {
     }
 
     public function __get($name) {
-        if(in_array($name, ['name', 'initial', 'present', 'value', 'description'])) {
+        if(in_array($name, ['name', 'initial', 'present', 'value', 'description', 'valueLabel'])) {
             if($this->parseTrigger && ($name === 'present' || $name === 'value')) {
                 call_user_func($this->parseTrigger);
                 $this->parseTrigger = null;
