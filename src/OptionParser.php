@@ -18,7 +18,7 @@ class OptionParser implements \ArrayAccess, \Iterator, \Countable {
      * Set this flag to allow any options to be passed, including
      * those not explicitly added at runtime.
      */
-    const ALLOW_ANY = 1;
+    const ALLOW_UNDECLARED = 0b1;
 
     public static $falsePrefix = 'no';
 
@@ -42,7 +42,16 @@ class OptionParser implements \ArrayAccess, \Iterator, \Countable {
      */
     private $argv;
 
-    public function __construct($argv = null) {
+    /**
+     * @var int
+     */
+    private $flags = 0;
+
+    /**
+     * @param array $argv Arguments to parse
+     * @param int $flags,... One or more flags as defined by the constants on this class
+     */
+    public function __construct(array $argv = null, $flags = null) {
 
         // If no args are given, try to use globals
         if($argv === null) {
@@ -94,6 +103,60 @@ class OptionParser implements \ArrayAccess, \Iterator, \Countable {
                 }
             }
 
+            // The most recently parsed option, to which value(s) can be added
+            $recentOption = null;
+
+            // Traverse the arguments a little. The length
+            // may change, so we'll avoid foreach for now
+            for($i = 0; $i < count($argv); ++$i) {
+
+                $arg = $argv[$i];
+
+                // Pattern to match options and (optionally) =values
+                if(preg_match('`^(--[a-z][a-z\d-]|-[a-z\d?])(=.+)?$`i', $arg, $matches)) {
+
+                    // Start with a value of true, and no option
+                    $value = true;
+                    $option = null;
+
+                    // Long names
+                    if(substr($arg, 0, 2) === '--') {
+                        $name = substr($matches[1], 2);
+                        $initial = null;
+
+                        // Look for a negate prefix
+                        $falsePrefixLength = strlen(self::$falsePrefix) + 1;
+                        if(substr($name, 0, $falsePrefixLength) === self::$falsePrefix . '-') {
+
+                            $value = false;
+                            $name = substr($name, $falsePrefixLength);
+                        }
+
+                        if(isset($this->dictionaryByName[$name])) {
+                            $option = $this->dictionaryByName[$name];
+                        }
+                    }
+
+                    // Initials/short names
+                    else {
+                        $initial = $arg[1];
+                        $name = null;
+
+                        if(isset($this->dictionaryByInitial[$initial])) {
+                            $option = $initial;
+                        }
+                    }
+
+                    // Is this an undeclared option
+
+
+                    if(isset($matches[2])) {
+
+                    }
+                }
+
+
+            }
 
         }
         return $this;

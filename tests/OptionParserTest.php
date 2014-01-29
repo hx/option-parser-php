@@ -26,9 +26,10 @@ class OptionParserTest extends PHPUnit_Framework_TestCase {
 
     /**
      * @param $variation
+     * @param $optionCount
      * @dataProvider dataValue
      */
-    public function testValue($variation) {
+    public function testValue($variation, $optionCount) {
         $parser = new OptionParser([$variation]);
         $foo = $parser->add('f', 'foo');
         $parser->add('x');
@@ -36,15 +37,15 @@ class OptionParserTest extends PHPUnit_Framework_TestCase {
         $this->assertSame('bar', $foo->value);
         $this->assertTrue($parser['foo']);
         $this->assertTrue($parser['f']);
-        $this->assertCount(2, $parser->options);
+        $this->assertCount($optionCount, $parser->options);
         $this->assertCount(0, $parser->arguments);
     }
     public function dataValue() {
         return [
-            ['--foo=bar'],
-            ['-xf=bar'],
-            ['--foo bar'],
-            ['-f bar']
+            ['--foo=bar', 1],
+            ['-xf=bar', 2],
+            ['--foo bar', 1],
+            ['-f bar', 1]
         ];
     }
 

@@ -2,7 +2,7 @@
     "name": "hx/option-parser",
     "description": "Option Parser for CLI Apps",
     "require-dev": {
-        "phpunit/phpunit": "3.7@stable"
+        "phpunit/phpunit": "3.7.*"
     },
     "license": "Apache License 2.0",
     "authors": [
