@@ -65,6 +65,36 @@ class OptionParserTest extends PHPUnit_Framework_TestCase {
     }
 
     /**
+     * @param string[] $args Input args
+     * @param string[] $foo What foo should be
+     * @dataProvider dataMultipleValues
+     */
+    public function testMultipleValues($args, $foo) {
+        $parser = new OptionParser($args);
+        $parser->add([
+            ['foo', Option::REQUIRE_VALUE, Option::MULTIPLE_VALUES],
+            ['bar', Option::REQUIRE_VALUE, Option::MULTIPLE_VALUES]
+        ]);
+        $this->assertEquals($foo, $parser['foo']);
+    }
+    public function dataMultipleValues() {
+        return [
+            [
+                ['--foo', 'a', 'b', 'c'],
+                ['a', 'b', 'c']
+            ],
+            [
+                ['--foo', 'a', 'b', '--foo', 'c'],
+                ['a', 'b', 'c']
+            ],
+            [
+                ['--bar', 'x', '--foo', 'a', '--bar', 'y', '--foo', 'b', 'c'],
+                ['a', 'b', 'c']
+            ]
+        ];
+    }
+
+    /**
      * @param $argv
      * @param $default
      * @param $expect

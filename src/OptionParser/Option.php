@@ -177,7 +177,20 @@ class Option {
     public function __set($name, $value) {
         if($name === 'value') {
             if(is_array($this->value)) {
-                $this->value[] = $value;
+
+                // Remove 'true' from a list of values that would previously
+                // have been assigned upon detecting presence of the option
+                if(isset($this->value[0]) && $this->value[0] === true) {
+
+                    // Unsetting $value[0] will cause the next push to have an
+                    // offset of 1, so we'll just replace the array.
+                    $this->value = [];
+                }
+
+                // Don't add 'true' to a non-empty list
+                if($value !== true || !$this->value) {
+                    $this->value[] = $value;
+                }
             }
             elseif(!$this->present || (is_string($value) && $this->value === true)) {
                 $this->value = $value;

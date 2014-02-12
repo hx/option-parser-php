@@ -164,7 +164,7 @@ class OptionParser implements \ArrayAccess, \Iterator, \Countable {
 
                     // Ensure the previous option got a value if one was required
                     // TODO: repeat this after the last argument
-                    if($recentOption && $recentOption->REQUIRE_VALUE && !is_string($recentOption->value)) {
+                    if($recentOption && $recentOption->REQUIRE_VALUE && !(is_string($recentOption->value) || is_array($recentOption->value))) {
                         throw new InvalidArgument($argv, $i - 1, "Option '{$argv[$i - 1]}' requires a value.");
                     }
 
