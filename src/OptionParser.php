@@ -456,7 +456,7 @@ class OptionParser implements \ArrayAccess, \Iterator, \Countable {
 
                     // Can it be negated?
                     if($item->ALLOW_FALSE) {
-                        $def .= '[' . self::$falsePrefix . ']-';
+                        $def .= '[' . self::$falsePrefix . '-]';
                     }
 
                     $def .= $item->name;

@@ -94,6 +94,12 @@ class OptionParserTest extends PHPUnit_Framework_TestCase {
         ];
     }
 
+    public function testSpacesInArgs() {
+        $parser = new OptionParser(['--foo', 'a b c']);
+        $parser->add('foo', Option::MULTIPLE_VALUES);
+        $this->assertEquals(['a b c'], $parser['foo']);
+    }
+
     /**
      * @param $argv
      * @param $default
@@ -132,7 +138,7 @@ class OptionParserTest extends PHPUnit_Framework_TestCase {
 Here is how we want it to look.
 
   -a, --alpha              Something with alpha
-  -b, --[no]-beta          Something with beta that also
+  -b, --[no-]beta          Something with beta that also
                            allows false values, and has an
                            explanation long enough to wrap
   -c  SOMETHING            Something with a value label
